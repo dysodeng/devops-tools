@@ -1,3 +1,3 @@
-module github.com/dysodeng/dev-tools
+module github.com/dysodeng/devops-tools
 
 go 1.21
