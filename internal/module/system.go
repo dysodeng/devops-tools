@@ -120,7 +120,7 @@ var initCmd = &cobra.Command{
 	},
 }
 
-func init() {
+func initSystemCmd() {
 	initCmd.Flags().BoolVarP(&initWithDefaultSource, "default-source", "", false, "default-source")
 	initCmd.Flags().StringVarP(&initWithSource, "source", "", "", "source")
 	SystemCmd.AddCommand(

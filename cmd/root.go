@@ -21,6 +21,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(module.VersionCmd)
 	rootCmd.AddCommand(module.SystemCmd)
+	rootCmd.AddCommand(module.ContainerCmd)
 }
 
 func Execute() {

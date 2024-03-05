@@ -3,7 +3,6 @@ package pkg
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -57,11 +56,7 @@ func PrintOutput(reader *bufio.Reader) {
 	for {
 		n, err := reader.Read(outputBytes)
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println(err)
-			sumOutput += err.Error()
+			break
 		}
 		output := string(outputBytes[:n])
 		fmt.Print(output)
