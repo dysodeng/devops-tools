@@ -22,6 +22,7 @@ func init() {
 	rootCmd.AddCommand(module.VersionCmd)
 	rootCmd.AddCommand(module.SystemCmd)
 	rootCmd.AddCommand(module.ContainerCmd)
+	rootCmd.AddCommand(module.KubernetesCmd)
 }
 
 func Execute() {

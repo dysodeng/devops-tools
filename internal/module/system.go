@@ -13,12 +13,17 @@ import (
 	"strings"
 )
 
+var ArchMap = map[string]string{
+	"amd64": "x86_64",
+	"arm64": "aarch64",
+}
+
 // System 操作系统信息
 type System struct {
 	OS                   string // 操作系统类型
 	Arch                 string // 平台架构
 	LinuxDistro          string // Linux发行版名称
-	LinuxDistroVersion   string // Linux发行版(饮食版本)
+	LinuxDistroVersion   string // Linux发行版(full版本号)
 	LinuxKernel          string // Linux内核版本
 	LinuxKernelMasterNum int    // Linux内核主要版本
 	CpuCores             int    // Cpu核心数
@@ -97,10 +102,6 @@ var initCmd = &cobra.Command{
 			log.Println("操作系统不是Linux")
 			os.Exit(1)
 		}
-		if info.Arch != "amd64" {
-			log.Println("只支持x86_64的系统")
-			os.Exit(1)
-		}
 
 		// 更换软件源
 		err := changeSource(info.LinuxDistro, initWithDefaultSource, initWithSource)
@@ -137,21 +138,17 @@ func systemInfo() System {
 	var linuxKernelMasterNum int
 	if osType == "linux" {
 		// 获取linux发行版本
-		distroCmd := exec.Command("lsb_release", "-d")
+		distroCmd := exec.Command("lsb_release", "-a")
 		distroOutput, err := distroCmd.Output()
 		if err == nil {
-			out := string(distroOutput)
-			linuxDistroVersion = strings.TrimSpace(strings.Replace(out, "Description:", "", -1))
-			switch true {
-			case strings.Contains(linuxDistroVersion, "CentOS"):
-				linuxDistro = "CentOS"
-				break
-			case strings.Contains(linuxDistroVersion, "Ubuntu"):
-				linuxDistro = "Ubuntu"
-				break
-			case strings.Contains(linuxDistroVersion, "Debian"):
-				linuxDistro = "Debian"
-				break
+			list := strings.Split(string(distroOutput), "\n")
+			for _, out := range list {
+				if strings.Contains(out, "Distributor ID:") {
+					linuxDistro = strings.TrimSpace(strings.Replace(out, "Distributor ID:", "", -1))
+				}
+				if strings.Contains(out, "Description:") {
+					linuxDistroVersion = strings.TrimSpace(strings.Replace(out, "Description:", "", -1))
+				}
 			}
 		}
 
@@ -210,6 +207,12 @@ func cleanSystemSource(linuxDistro string) error {
 		if err != nil {
 			return err
 		}
+		break
+
+	case "Ubuntu":
+		break
+
+	case "Debian":
 		break
 	}
 
@@ -304,6 +307,12 @@ func upgradeLinuxKernel(linuxDistro string) error {
 		}
 		_ = pkg.ExecCmd(exec.Command("grub2-set-default", "0"))
 		fmt.Println("内核已更新，重启后生效")
+		break
+
+	case "Ubuntu":
+		break
+
+	case "Debian":
 		break
 	}
 	return err

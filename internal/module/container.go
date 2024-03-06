@@ -35,9 +35,9 @@ var installContainerCmd = &cobra.Command{
 
 		var err error
 		if containerWithDocker {
-			err = installDocker(info.LinuxDistro)
+			err = installDocker(info.LinuxDistro, info.Arch)
 		} else {
-			err = installContainerd(info.LinuxDistro)
+			err = installContainerd(info.LinuxDistro, info.Arch)
 		}
 		if err != nil {
 			fmt.Println(err.Error())
@@ -51,56 +51,47 @@ func initContainerCmd() {
 	ContainerCmd.AddCommand(installContainerCmd)
 }
 
-func installDocker(linuxDistro string) error {
+func installDocker(linuxDistro, arch string) error {
 	return nil
 }
 
-func installContainerd(linuxDistro string) error {
+func installContainerd(linuxDistro, arch string) error {
 	var err error
 	switch linuxDistro {
 	case "CentOS":
 		// 关闭防火墙
-		err = pkg.ExecCmd(exec.Command("systemctl", "stop", "firewalld.service"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("systemctl", "stop", "firewalld.service")); err != nil {
 			return err
 		}
-		err = pkg.ExecCmd(exec.Command("systemctl", "disable", "firewalld.service"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("systemctl", "disable", "firewalld.service")); err != nil {
 			return err
 		}
 
 		// 关闭selinux
-		err = pkg.ExecCmd(exec.Command("setenforce", "0"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("setenforce", "0")); err != nil {
 			return err
 		}
-		err = pkg.ExecCmd(exec.Command("sed", "-i", "s/^SELINUX=enforcing$/SELINUX=permissive/", "/etc/selinux/config"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("sed", "-i", "s/^SELINUX=enforcing$/SELINUX=permissive/", "/etc/selinux/config")); err != nil {
 			return err
 		}
 
 		// 安装containerd
-		err = pkg.ExecCmd(exec.Command("yum", "install", "-y", "yum-utils", "device-mapper-persistent-data", "lvm2"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("yum", "install", "-y", "yum-utils", "device-mapper-persistent-data", "lvm2")); err != nil {
 			return err
 		}
-		err = pkg.ExecCmd(exec.Command("yum-config-manager", "--add-repo", "https://download.docker.com/linux/centos/docker-ce.repo"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("yum-config-manager", "--add-repo", "https://download.docker.com/linux/centos/docker-ce.repo")); err != nil {
 			return err
 		}
-		err = pkg.ExecCmd(exec.Command("yum", "install", "-y", "containerd.io", "runc"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("yum", "install", "-y", "containerd.io", "runc")); err != nil {
 			return err
 		}
-		err = pkg.ExecCmd(exec.Command("systemctl", "stop", "containerd.service"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("systemctl", "stop", "containerd.service")); err != nil {
 			return err
 		}
 
 		// 配置containerd
 		_ = os.Mkdir("/etc/containerd", os.ModeDir)
-		err = os.Rename("/etc/containerd/config.toml", "/etc/containerd/config.toml.bak")
-		if err != nil {
+		if err = os.Rename("/etc/containerd/config.toml", "/etc/containerd/config.toml.bak"); err != nil {
 			return err
 		}
 		_ = pkg.ExecCmd(exec.Command("touch", "/etc/containerd/config.toml"))
@@ -111,32 +102,24 @@ func installContainerd(linuxDistro string) error {
 		}
 		configCmd := exec.Command("containerd", "config", "default")
 		configCmd.Stdout = configFile
-		err = configCmd.Run()
-		if err != nil {
+		if err = configCmd.Run(); err != nil {
 			return err
 		}
-		err = pkg.ExecCmd(exec.Command("sed", "-i", "s#registry.k8s.io/pause:3.6#registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.9#g", "/etc/containerd/config.toml"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("sed", "-i", "s#registry.k8s.io/pause:3.6#registry.aliyuncs.com/google_containers/pause:3.9#g", "/etc/containerd/config.toml")); err != nil {
 			return err
 		}
-		err = pkg.ExecCmd(exec.Command("sed", "-i", "s#SystemdCgroup = false#SystemdCgroup = true#g", "/etc/containerd/config.toml"))
-		if err != nil {
+		if err = pkg.ExecCmd(exec.Command("sed", "-i", "s#SystemdCgroup = false#SystemdCgroup = true#g", "/etc/containerd/config.toml")); err != nil {
 			return err
 		}
 
-		err = crictlConfig()
-		if err != nil {
+		if err = crictlConfig(); err != nil {
 			return err
 		}
 
 		// 启动containerd服务
-		err = pkg.ExecCmd(exec.Command("systemctl", "enable", "--now", "containerd.service"))
-		if err != nil {
-			return err
-		}
-
-		break
+		return pkg.ExecCmd(exec.Command("systemctl", "enable", "--now", "containerd.service"))
 	}
+
 	return nil
 }
 
@@ -149,12 +132,12 @@ func crictlConfig() error {
 		_ = configFile.Close()
 	}()
 
-	_, err := configFile.Write([]byte(`runtime-endpoint: unix:///run/containerd/containerd.sock
+	if _, err := configFile.Write([]byte(`runtime-endpoint: unix:///run/containerd/containerd.sock
 image-endpoint: unix:///run/containerd/containerd.sock
 timeout: 10
-debug: false`))
-	if err != nil {
+debug: false`)); err != nil {
 		return err
 	}
+
 	return nil
 }
