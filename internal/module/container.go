@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/dysodeng/devops-tools/internal/pkg"
 	"github.com/spf13/cobra"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -27,12 +26,6 @@ var installContainerCmd = &cobra.Command{
 	Short: "安装容器运行时，默认安装containerd",
 	Long:  "安装容器运行时，默认安装containerd",
 	Run: func(cmd *cobra.Command, args []string) {
-		// 获取当前操作系统
-		if system.OS != "linux" {
-			log.Println("操作系统不是Linux")
-			os.Exit(1)
-		}
-
 		var err error
 		if containerWithDocker {
 			err = installDocker(system.LinuxDistro, system.Arch)

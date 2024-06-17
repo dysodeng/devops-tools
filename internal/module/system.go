@@ -97,12 +97,6 @@ var initCmd = &cobra.Command{
 	Short: "系统初始化",
 	Long:  "系统初始化",
 	Run: func(cmd *cobra.Command, args []string) {
-		// 获取当前操作系统
-		if system.OS != "linux" {
-			log.Println("操作系统不是Linux")
-			os.Exit(1)
-		}
-
 		// 更换软件源
 		err := changeSource(system.LinuxDistro, initWithDefaultSource, initWithSource)
 		if err != nil {
@@ -136,37 +130,42 @@ func systemInfo() System {
 	osType := runtime.GOOS
 	var linuxDistro, linuxDistroVersion, linuxCodeName, linuxKernel string
 	var linuxKernelMasterNum int
-	if osType == "linux" {
-		// 获取linux发行版本
-		distroCmd := exec.Command("lsb_release", "-a")
-		distroOutput, err := distroCmd.Output()
-		if err == nil {
-			list := strings.Split(string(distroOutput), "\n")
-			for _, out := range list {
-				if strings.Contains(out, "Distributor ID:") {
-					linuxDistro = strings.TrimSpace(strings.Replace(out, "Distributor ID:", "", -1))
-				}
-				if strings.Contains(out, "Description:") {
-					linuxDistroVersion = strings.TrimSpace(strings.Replace(out, "Description:", "", -1))
-				}
-				if strings.Contains(out, "Codename:") {
-					linuxCodeName = strings.TrimSpace(strings.Replace(out, "Codename:", "", -1))
-				}
-			}
-		}
 
-		// 获取linux内核版本
-		kernelCmd := exec.Command("uname", "-r")
-		kernelOutput, err := kernelCmd.Output()
-		if err == nil {
-			linuxKernel = strings.TrimSpace(string(kernelOutput))
-			kernel := strings.Split(linuxKernel, ".")
-			kernelNum, err := strconv.ParseInt(kernel[0], 10, 64)
-			if err == nil {
-				linuxKernelMasterNum = int(kernelNum)
+	if osType != "linux" {
+		log.Println("The operating system needs to be Linux")
+		os.Exit(1)
+	}
+
+	// 获取linux发行版本
+	distroCmd := exec.Command("lsb_release", "-a")
+	distroOutput, err := distroCmd.Output()
+	if err == nil {
+		list := strings.Split(string(distroOutput), "\n")
+		for _, out := range list {
+			if strings.Contains(out, "Distributor ID:") {
+				linuxDistro = strings.TrimSpace(strings.Replace(out, "Distributor ID:", "", -1))
+			}
+			if strings.Contains(out, "Description:") {
+				linuxDistroVersion = strings.TrimSpace(strings.Replace(out, "Description:", "", -1))
+			}
+			if strings.Contains(out, "Codename:") {
+				linuxCodeName = strings.TrimSpace(strings.Replace(out, "Codename:", "", -1))
 			}
 		}
 	}
+
+	// 获取linux内核版本
+	kernelCmd := exec.Command("uname", "-r")
+	kernelOutput, err := kernelCmd.Output()
+	if err == nil {
+		linuxKernel = strings.TrimSpace(string(kernelOutput))
+		kernel := strings.Split(linuxKernel, ".")
+		kernelNum, err := strconv.ParseInt(kernel[0], 10, 64)
+		if err == nil {
+			linuxKernelMasterNum = int(kernelNum)
+		}
+	}
+
 	return System{
 		OS:                   osType,
 		Arch:                 runtime.GOARCH,

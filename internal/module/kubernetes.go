@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/dysodeng/devops-tools/internal/pkg"
 	"github.com/spf13/cobra"
-	"log"
 	"os"
 	"os/exec"
 	"os/user"
@@ -30,12 +29,6 @@ var installKubernetesCmd = &cobra.Command{
 	Short: "安装Kubernetes组件",
 	Long:  "安装Kubernetes组件",
 	Run: func(cmd *cobra.Command, args []string) {
-		// 获取当前操作系统
-		if system.OS != "linux" {
-			log.Println("操作系统不是Linux")
-			os.Exit(1)
-		}
-
 		if err := installKubernetes(); err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
@@ -49,12 +42,6 @@ var initKubernetesClusterCmd = &cobra.Command{
 	Short: "初始化Kubernetes集群",
 	Long:  "初始化Kubernetes集群",
 	Run: func(cmd *cobra.Command, args []string) {
-		// 获取当前操作系统
-		if system.OS != "linux" {
-			log.Println("操作系统不是Linux")
-			os.Exit(1)
-		}
-
 		if err := initKubernetesCluster(withKubernetesVersion); err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
@@ -71,12 +58,6 @@ var joinKubernetesNodeCmd = &cobra.Command{
 	Short: "Kubernetes加入节点",
 	Long:  "Kubernetes加入节点",
 	Run: func(cmd *cobra.Command, args []string) {
-		// 获取当前操作系统
-		if system.OS != "linux" {
-			log.Println("操作系统不是Linux")
-			os.Exit(1)
-		}
-
 		if err := joinKubernetesNode(joinMasterNode); err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
