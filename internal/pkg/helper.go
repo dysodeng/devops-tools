@@ -3,6 +3,7 @@ package pkg
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"sync"
@@ -61,5 +62,27 @@ func PrintOutput(reader *bufio.Reader) {
 		output := string(outputBytes[:n])
 		fmt.Print(output)
 		sumOutput += output
+	}
+}
+
+// CheckNetworkFileExists 检查网络文件是否存在
+func CheckNetworkFileExists(url string) bool {
+	resp, err := http.Head(url) // 发送HEAD请求获取HTTP头信息
+	if err != nil {
+		// 处理错误情况
+		return false
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	statusCode := resp.StatusCode
+	switch statusCode {
+	case http.StatusOK:
+		fallthrough
+	case http.StatusPartialContent:
+		return true
+	default:
+		return false
 	}
 }

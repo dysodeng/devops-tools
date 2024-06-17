@@ -4,5 +4,5 @@
 /client
 .DS_Store
 */.DS_Store
-devops
+devops*
 devops-tools

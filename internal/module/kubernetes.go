@@ -31,13 +31,12 @@ var installKubernetesCmd = &cobra.Command{
 	Long:  "安装Kubernetes组件",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取当前操作系统
-		info := systemInfo()
-		if info.OS != "linux" {
+		if system.OS != "linux" {
 			log.Println("操作系统不是Linux")
 			os.Exit(1)
 		}
 
-		if err := installKubernetes(info.LinuxDistro, info.Arch); err != nil {
+		if err := installKubernetes(); err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
 		}
@@ -51,8 +50,7 @@ var initKubernetesClusterCmd = &cobra.Command{
 	Long:  "初始化Kubernetes集群",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取当前操作系统
-		info := systemInfo()
-		if info.OS != "linux" {
+		if system.OS != "linux" {
 			log.Println("操作系统不是Linux")
 			os.Exit(1)
 		}
@@ -74,8 +72,7 @@ var joinKubernetesNodeCmd = &cobra.Command{
 	Long:  "Kubernetes加入节点",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取当前操作系统
-		info := systemInfo()
-		if info.OS != "linux" {
+		if system.OS != "linux" {
 			log.Println("操作系统不是Linux")
 			os.Exit(1)
 		}
@@ -95,15 +92,15 @@ func initKubernetes() {
 }
 
 // installKubernetes 安装k8s组件
-func installKubernetes(linuxDistro, arch string) error {
-	switch linuxDistro {
+func installKubernetes() error {
+	switch system.LinuxDistro {
 	case "CentOS":
 		// 禁用swap分区
 		_ = pkg.ExecCmd(exec.Command("swapoff", "-a"))
 		_ = pkg.ExecCmd(exec.Command("sed", "-i", "s/.*swap.*/#&/", "/etc/fstab"))
 
 		// k8s sysctl 配置
-		if err := k8sSysctlCentosConfig(); err != nil {
+		if err := k8sSysctlConfig(); err != nil {
 			return err
 		}
 		if err := pkg.ExecCmd(exec.Command("sysctl", "--system")); err != nil {
@@ -125,12 +122,12 @@ func installKubernetes(linuxDistro, arch string) error {
 		if err := pkg.ExecCmd(exec.Command("modprobe", "iptable_filter")); err != nil {
 			return err
 		}
-		if err := k8sModuleLoadCentosConfig(); err != nil {
+		if err := k8sModuleLoadConfig(); err != nil {
 			return err
 		}
 
 		// 安装k8s组件
-		if err := k8sRepoCentosConfig(arch); err != nil {
+		if err := k8sRepoCentosConfig(); err != nil {
 			return err
 		}
 
@@ -144,13 +141,140 @@ func installKubernetes(linuxDistro, arch string) error {
 		if err := pkg.ExecCmd(exec.Command("systemctl", "enable", "kubelet", "--now")); err != nil {
 			return err
 		}
+		_ = pkg.ExecCmd(exec.Command("systemctl", "status", "kubelet"))
 		break
 
 	case "Ubuntu":
+		// 禁用swap分区
+		_ = pkg.ExecCmd(exec.Command("swapoff", "-a"))
+		_ = pkg.ExecCmd(exec.Command("sed", "-i", "s/.*swap.*/#&/", "/etc/fstab"))
+
+		if err := pkg.ExecCmd(exec.Command("apt", "update")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("apt", "install", "-y", "apt-transport-https")); err != nil {
+			return err
+		}
+
+		// k8s sysctl 配置
+		if err := k8sSysctlConfig(); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("sysctl", "--system")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("apt", "install", "-y", "ipset", "ipvsadm")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "overlay")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "br_netfilter")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "ip_tables")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "iptable_filter")); err != nil {
+			return err
+		}
+
+		// 安装k8s组件
+		if err := pkg.ExecCmd(exec.Command("/bin/bash", "-c", `curl -fsSL https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg | apt-key add -`)); err != nil {
+			return err
+		}
+		if pkg.CheckNetworkFileExists("https://mirrors.aliyun.com/kubernetes/apt/kubernetes-" + system.CodeName + "/Release") {
+			if err := pkg.ExecCmd(exec.Command("/bin/bash", "-c", fmt.Sprintf(`add-apt-repository "deb [arch=%s] https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-%s main")`, system.Arch, system.CodeName))); err != nil {
+				return err
+			}
+		} else {
+			if err := pkg.ExecCmd(exec.Command("/bin/bash", "-c", fmt.Sprintf(`add-apt-repository "deb [arch=%s] https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main"`, system.Arch))); err != nil {
+				return err
+			}
+		}
+		if err := pkg.ExecCmd(exec.Command("apt", "update")); err != nil {
+			return err
+		}
+		k8sVersion := strings.Replace(withKubernetesVersion, "v", "", -1)
+		if err := pkg.ExecCmd(exec.Command("apt", "install", "-y", "kubelet="+k8sVersion+"-00", "kubeadm="+k8sVersion+"-00", "kubectl="+k8sVersion+"-00", "kubernetes-cni")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("systemctl", "daemon-reload")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("systemctl", "enable", "kubelet", "--now")); err != nil {
+			return err
+		}
+		_ = pkg.ExecCmd(exec.Command("systemctl", "status", "kubelet"))
 		break
 
 	case "Debian":
+		// 禁用swap分区
+		_ = pkg.ExecCmd(exec.Command("swapoff", "-a"))
+		_ = pkg.ExecCmd(exec.Command("sed", "-i", "s/.*swap.*/#&/", "/etc/fstab"))
+
+		if err := pkg.ExecCmd(exec.Command("apt", "update")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("apt", "install", "-y", "apt-transport-https", "gnupg2", "gnupg1", "gnupg")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("apt", "install", "-y", "software-properties-common", "dirmngr", "lsb-release", "ca-certificates")); err != nil {
+			return err
+		}
+
+		// k8s sysctl 配置
+		if err := k8sSysctlConfig(); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("sysctl", "--system")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("apt", "install", "-y", "ipset", "ipvsadm")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "overlay")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "br_netfilter")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "ip_tables")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("modprobe", "iptable_filter")); err != nil {
+			return err
+		}
+
+		// 安装k8s组件
+		if err := pkg.ExecCmd(exec.Command("/bin/bash", "-c", `curl -fsSL https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg | apt-key add -`)); err != nil {
+			return err
+		}
+		if pkg.CheckNetworkFileExists("https://mirrors.aliyun.com/kubernetes/apt/kubernetes-" + system.CodeName + "/Release") {
+			if err := pkg.ExecCmd(exec.Command("/bin/bash", "-c", fmt.Sprintf(`add-apt-repository "deb [arch=%s] https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-%s main")`, system.Arch, system.CodeName))); err != nil {
+				return err
+			}
+		} else {
+			if err := pkg.ExecCmd(exec.Command("/bin/bash", "-c", fmt.Sprintf(`add-apt-repository "deb [arch=%s] https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main"`, system.Arch))); err != nil {
+				return err
+			}
+		}
+		if err := pkg.ExecCmd(exec.Command("apt", "update")); err != nil {
+			return err
+		}
+		k8sVersion := strings.Replace(withKubernetesVersion, "v", "", -1)
+		if err := pkg.ExecCmd(exec.Command("apt", "install", "-y", "kubelet="+k8sVersion+"-00", "kubeadm="+k8sVersion+"-00", "kubectl="+k8sVersion+"-00", "kubernetes-cni")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("systemctl", "daemon-reload")); err != nil {
+			return err
+		}
+		if err := pkg.ExecCmd(exec.Command("systemctl", "enable", "kubelet", "--now")); err != nil {
+			return err
+		}
+		_ = pkg.ExecCmd(exec.Command("systemctl", "status", "kubelet"))
 		break
+
 	}
 	return nil
 }
@@ -217,17 +341,17 @@ func joinKubernetesNode(withMaster bool) error {
 
 	var masterTag string
 	if withMaster {
-		masterTag = "--control-plane"
+		masterTag = " --control-plane"
 	}
 
 	fmt.Printf(`kubeadm join %s:6443 --token %s \
-        --discovery-token-ca-cert-hash sha256:%s %s
+        --discovery-token-ca-cert-hash sha256:%s%s
 `, serverAddr, token, certKey, masterTag)
 
 	return nil
 }
 
-func k8sSysctlCentosConfig() error {
+func k8sSysctlConfig() error {
 	configFile, e := os.OpenFile("/etc/sysctl.d/k8s.conf", os.O_CREATE|os.O_RDWR, 0644)
 	if e != nil {
 		return e
@@ -246,7 +370,7 @@ vm.swappiness=0`)); err != nil {
 	return nil
 }
 
-func k8sModuleLoadCentosConfig() error {
+func k8sModuleLoadConfig() error {
 	configFile, e := os.OpenFile("/etc/modules-load.d/k8s.conf", os.O_CREATE|os.O_RDWR, 0644)
 	if e != nil {
 		return e
@@ -265,7 +389,7 @@ iptable_filter`)); err != nil {
 	return nil
 }
 
-func k8sRepoCentosConfig(arch string) error {
+func k8sRepoCentosConfig() error {
 	configFile, e := os.OpenFile("/etc/yum.repos.d/kubernetes.repo", os.O_CREATE|os.O_RDWR, 0644)
 	if e != nil {
 		return e
@@ -274,7 +398,7 @@ func k8sRepoCentosConfig(arch string) error {
 		_ = configFile.Close()
 	}()
 
-	arch = ArchMap[arch]
+	arch := ArchMap[system.Arch]
 
 	if _, err := configFile.Write([]byte(fmt.Sprintf(`[kubernetes]
 name=Kubernetes

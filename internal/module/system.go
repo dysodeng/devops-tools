@@ -26,8 +26,11 @@ type System struct {
 	LinuxDistroVersion   string // Linux发行版(full版本号)
 	LinuxKernel          string // Linux内核版本
 	LinuxKernelMasterNum int    // Linux内核主要版本
+	CodeName             string // Linux发行版代号
 	CpuCores             int    // Cpu核心数
 }
+
+var system = System{}
 
 var SystemCmd = &cobra.Command{
 	Use:   "system",
@@ -44,19 +47,18 @@ var infoCmd = &cobra.Command{
 	Long:  "系统信息",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取当前操作系统
-		info := systemInfo()
 		tablePrefix := "\t"
-		if info.OS == "linux" {
+		if system.OS == "linux" {
 			tablePrefix = "\t\t"
 		}
 		fmt.Println("---------- 系统信息 ----------")
-		fmt.Printf("OS:%s%s\n", tablePrefix, info.OS)
-		fmt.Printf("Arch:%s%s\n", tablePrefix, info.Arch)
-		if info.OS == "linux" {
-			fmt.Printf("Linux Dist:\t%s\n", info.LinuxDistroVersion)
-			fmt.Printf("Linux Kernel:\t%s\n", info.LinuxKernel)
+		fmt.Printf("OS:%s%s\n", tablePrefix, system.OS)
+		fmt.Printf("Arch:%s%s\n", tablePrefix, system.Arch)
+		if system.OS == "linux" {
+			fmt.Printf("Linux Dist:\t%s\n", system.LinuxDistroVersion)
+			fmt.Printf("Linux Kernel:\t%s\n", system.LinuxKernel)
 		}
-		fmt.Printf("Cpus:%s%d\n", tablePrefix, info.CpuCores)
+		fmt.Printf("Cpus:%s%d\n", tablePrefix, system.CpuCores)
 	},
 }
 
@@ -66,13 +68,12 @@ var toolCmd = &cobra.Command{
 	Long:  "安装系统必要的工具",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取当前操作系统
-		info := systemInfo()
-		if info.OS != "linux" {
+		if system.OS != "linux" {
 			fmt.Println("操作系统不是Linux")
 			os.Exit(1)
 		}
 
-		err := toolInstall(info.LinuxDistro)
+		err := toolInstall(system.LinuxDistro)
 		if err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
@@ -97,22 +98,21 @@ var initCmd = &cobra.Command{
 	Long:  "系统初始化",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取当前操作系统
-		info := systemInfo()
-		if info.OS != "linux" {
+		if system.OS != "linux" {
 			log.Println("操作系统不是Linux")
 			os.Exit(1)
 		}
 
 		// 更换软件源
-		err := changeSource(info.LinuxDistro, initWithDefaultSource, initWithSource)
+		err := changeSource(system.LinuxDistro, initWithDefaultSource, initWithSource)
 		if err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
 		}
 
 		// 升级Linux内核版本
-		if info.LinuxKernelMasterNum < 4 {
-			err = upgradeLinuxKernel(info.LinuxDistro)
+		if system.LinuxKernelMasterNum < 4 {
+			err = upgradeLinuxKernel(system.LinuxDistro)
 			if err != nil {
 				fmt.Println(err.Error())
 				os.Exit(1)
@@ -134,7 +134,7 @@ func initSystemCmd() {
 // systemInfo 获取操作系统信息
 func systemInfo() System {
 	osType := runtime.GOOS
-	var linuxDistro, linuxDistroVersion, linuxKernel string
+	var linuxDistro, linuxDistroVersion, linuxCodeName, linuxKernel string
 	var linuxKernelMasterNum int
 	if osType == "linux" {
 		// 获取linux发行版本
@@ -148,6 +148,9 @@ func systemInfo() System {
 				}
 				if strings.Contains(out, "Description:") {
 					linuxDistroVersion = strings.TrimSpace(strings.Replace(out, "Description:", "", -1))
+				}
+				if strings.Contains(out, "Codename:") {
+					linuxCodeName = strings.TrimSpace(strings.Replace(out, "Codename:", "", -1))
 				}
 			}
 		}
@@ -171,6 +174,7 @@ func systemInfo() System {
 		LinuxDistroVersion:   linuxDistroVersion,
 		LinuxKernel:          linuxKernel,
 		LinuxKernelMasterNum: linuxKernelMasterNum,
+		CodeName:             linuxCodeName,
 		CpuCores:             runtime.NumCPU(),
 	}
 }
