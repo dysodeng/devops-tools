@@ -1,4 +1,4 @@
-package module
+package version
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 
 const version = "v0.0.1"
 
-var VersionCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "version",
 	Short: "version for devops",
 	Long:  "version for devops",

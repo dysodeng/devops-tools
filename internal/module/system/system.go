@@ -1,17 +1,16 @@
-package module
+package system
 
 import (
 	"errors"
 	"fmt"
+	"github.com/dysodeng/devops-tools/internal/pkg"
+	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
-
-	"github.com/dysodeng/devops-tools/internal/pkg"
-	"github.com/spf13/cobra"
 )
 
 var ArchMap = map[string]string{
@@ -19,8 +18,8 @@ var ArchMap = map[string]string{
 	"arm64": "aarch64",
 }
 
-// System 操作系统信息
-type System struct {
+// system 操作系统信息
+type system struct {
 	OS                   string // 操作系统类型
 	Arch                 string // 平台架构
 	LinuxDistro          string // Linux发行版名称
@@ -31,9 +30,13 @@ type System struct {
 	CpuCores             int    // Cpu核心数
 }
 
-var system = System{}
+var System = system{}
 
-var SystemCmd = &cobra.Command{
+func init() {
+	systemInfo()
+}
+
+var Cmd = &cobra.Command{
 	Use:   "system",
 	Short: "操作系统配置",
 	Long:  "操作系统配置",
@@ -49,17 +52,17 @@ var infoCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取当前操作系统
 		tablePrefix := "\t"
-		if system.OS == "linux" {
+		if System.OS == "linux" {
 			tablePrefix = "\t\t"
 		}
 		fmt.Println("---------- 系统信息 ----------")
-		fmt.Printf("OS:%s%s\n", tablePrefix, system.OS)
-		fmt.Printf("Arch:%s%s\n", tablePrefix, system.Arch)
-		if system.OS == "linux" {
-			fmt.Printf("Linux Dist:\t%s\n", system.LinuxDistroVersion)
-			fmt.Printf("Linux Kernel:\t%s\n", system.LinuxKernel)
+		fmt.Printf("OS:%s%s\n", tablePrefix, System.OS)
+		fmt.Printf("Arch:%s%s\n", tablePrefix, System.Arch)
+		if System.OS == "linux" {
+			fmt.Printf("Linux Dist:\t%s\n", System.LinuxDistroVersion)
+			fmt.Printf("Linux Kernel:\t%s\n", System.LinuxKernel)
 		}
-		fmt.Printf("Cpus:%s%d\n", tablePrefix, system.CpuCores)
+		fmt.Printf("Cpus:%s%d\n", tablePrefix, System.CpuCores)
 	},
 }
 
@@ -68,7 +71,7 @@ var toolCmd = &cobra.Command{
 	Short: "安装系统必要的工具",
 	Long:  "安装系统必要的工具",
 	Run: func(cmd *cobra.Command, args []string) {
-		err := toolInstall(system.LinuxDistro)
+		err := toolInstall(System.LinuxDistro)
 		if err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
@@ -93,15 +96,15 @@ var initCmd = &cobra.Command{
 	Long:  "系统初始化",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 更换软件源
-		err := changeSource(system.LinuxDistro, initWithDefaultSource, initWithSource)
+		err := changeSource(System.LinuxDistro, initWithDefaultSource, initWithSource)
 		if err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
 		}
 
 		// 升级Linux内核版本
-		if system.LinuxKernelMasterNum < 4 {
-			err = upgradeLinuxKernel(system.LinuxDistro)
+		if System.LinuxKernelMasterNum < 4 {
+			err = upgradeLinuxKernel(System.LinuxDistro)
 			if err != nil {
 				fmt.Println(err.Error())
 				os.Exit(1)
@@ -110,10 +113,10 @@ var initCmd = &cobra.Command{
 	},
 }
 
-func initSystemCmd() {
+func InitSystemCmd() {
 	initCmd.Flags().BoolVarP(&initWithDefaultSource, "default-source", "", false, "default-source")
 	initCmd.Flags().StringVarP(&initWithSource, "source", "", "", "source")
-	SystemCmd.AddCommand(
+	Cmd.AddCommand(
 		infoCmd,
 		toolCmd,
 		initCmd,
@@ -121,7 +124,7 @@ func initSystemCmd() {
 }
 
 // systemInfo 获取操作系统信息
-func systemInfo() System {
+func systemInfo() {
 	osType := runtime.GOOS
 	var linuxDistro, linuxDistroVersion, linuxCodeName, linuxKernel string
 	var linuxKernelMasterNum int
@@ -189,7 +192,7 @@ sysInfo:
 		}
 	}
 
-	return System{
+	System = system{
 		OS:                   osType,
 		Arch:                 runtime.GOARCH,
 		LinuxDistro:          linuxDistro,
