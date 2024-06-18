@@ -17,6 +17,6 @@ func InitKubernetesCmd() {
 	installKubernetesCmd.Flags().BoolVarP(&containerWithDocker, "with-docker", "", false, "使用Docker，默认为containerd")
 	installKubernetesCmd.Flags().StringVarP(&withKubernetesVersion, "with-version", "", "v1.27.6", "指定Kubernetes版本")
 	initKubernetesClusterCmd.Flags().StringVarP(&withKubernetesVersion, "with-version", "", "v1.27.6", "指定Kubernetes版本")
-	joinKubernetesNodeCmd.Flags().BoolVarP(&joinMasterNode, "with-master", "", false, "加入master节点")
+	joinKubernetesNodeCmd.Flags().BoolVarP(&joinMasterNode, "control-plane", "", false, "加入控制面节点")
 	Cmd.AddCommand(loadImageCmd, installKubernetesCmd, initKubernetesClusterCmd, joinKubernetesNodeCmd)
 }
