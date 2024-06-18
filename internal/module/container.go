@@ -2,11 +2,12 @@ package module
 
 import (
 	"fmt"
-	"github.com/dysodeng/devops-tools/internal/pkg"
-	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/dysodeng/devops-tools/internal/pkg"
+	"github.com/spf13/cobra"
 )
 
 var ContainerCmd = &cobra.Command{
@@ -18,7 +19,11 @@ var ContainerCmd = &cobra.Command{
 	},
 }
 
-var containerWithDocker bool // 使用Docker，否则使用containerd
+// containerWithDocker 使用Docker，否则使用containerd
+var containerWithDocker bool
+
+// containerWithDataDirectory 指定容器运行时数据存储目录
+var containerWithDataDirectory string
 
 // installContainerCmd 安装容器运行时
 var installContainerCmd = &cobra.Command{
@@ -41,6 +46,7 @@ var installContainerCmd = &cobra.Command{
 
 func initContainerCmd() {
 	installContainerCmd.Flags().BoolVarP(&containerWithDocker, "with-docker", "", false, "安装Docker")
+	installContainerCmd.Flags().StringVarP(&containerWithDataDirectory, "with-data", "", "", "指定容器运行时数据存储目录")
 	ContainerCmd.AddCommand(installContainerCmd)
 }
 
@@ -72,7 +78,7 @@ func installContainerd(linuxDistro, arch string) error {
 		if err = pkg.ExecCmd(exec.Command("yum", "install", "-y", "yum-utils", "device-mapper-persistent-data", "lvm2")); err != nil {
 			return err
 		}
-		if err = pkg.ExecCmd(exec.Command("yum-config-manager", "--add-repo", "https://download.docker.com/linux/centos/docker-ce.repo")); err != nil {
+		if err = pkg.ExecCmd(exec.Command("yum-config-manager", "--add-repo", "https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo")); err != nil {
 			return err
 		}
 		if err = pkg.ExecCmd(exec.Command("yum", "install", "-y", "containerd.io", "runc")); err != nil {
@@ -103,6 +109,13 @@ func installContainerd(linuxDistro, arch string) error {
 		}
 		if err = pkg.ExecCmd(exec.Command("sed", "-i", "s#SystemdCgroup = false#SystemdCgroup = true#g", "/etc/containerd/config.toml")); err != nil {
 			return err
+		}
+
+		// 指定数据目录
+		if containerWithDataDirectory != "" {
+			if err = pkg.ExecCmd(exec.Command("sed", "-i", fmt.Sprintf("s#/var/lib/containerd#%s#g", containerWithDataDirectory), "/etc/containerd/config.toml")); err != nil {
+				return err
+			}
 		}
 
 		if err = crictlConfig(); err != nil {
@@ -161,6 +174,13 @@ func installContainerd(linuxDistro, arch string) error {
 		}
 		if err = pkg.ExecCmd(exec.Command("sed", "-i", "s#SystemdCgroup = false#SystemdCgroup = true#g", "/etc/containerd/config.toml")); err != nil {
 			return err
+		}
+
+		// 指定数据目录
+		if containerWithDataDirectory != "" {
+			if err = pkg.ExecCmd(exec.Command("sed", "-i", fmt.Sprintf("s#/var/lib/containerd#%s#g", containerWithDataDirectory), "/etc/containerd/config.toml")); err != nil {
+				return err
+			}
 		}
 
 		if err = crictlConfig(); err != nil {

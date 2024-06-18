@@ -2,12 +2,13 @@ package module
 
 import (
 	"fmt"
-	"github.com/dysodeng/devops-tools/internal/pkg"
-	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 	"os/user"
 	"strings"
+
+	"github.com/dysodeng/devops-tools/internal/pkg"
+	"github.com/spf13/cobra"
 )
 
 // KubernetesCmd k8s配置命令
@@ -36,6 +37,8 @@ var installKubernetesCmd = &cobra.Command{
 	},
 }
 
+var withInitKubernetesWorkerNode bool // 初始化工作节点
+
 // initKubernetesClusterCmd 初始化k8s集群
 var initKubernetesClusterCmd = &cobra.Command{
 	Use:   "init-cluster",
@@ -43,6 +46,19 @@ var initKubernetesClusterCmd = &cobra.Command{
 	Long:  "初始化Kubernetes集群",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := initKubernetesCluster(withKubernetesVersion); err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+	},
+}
+
+// initKubernetesNetworkCmd 初始化k8s集群网络
+var initKubernetesNetworkCmd = &cobra.Command{
+	Use:   "init-network",
+	Short: "初始化Kubernetes集群网络",
+	Long:  "初始化Kubernetes集群网络",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := initKubernetesNetwork(); err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
 		}
@@ -68,8 +84,10 @@ var joinKubernetesNodeCmd = &cobra.Command{
 func initKubernetes() {
 	installKubernetesCmd.Flags().StringVarP(&withKubernetesVersion, "with-version", "", "v1.27.6", "指定Kubernetes版本")
 	initKubernetesClusterCmd.Flags().StringVarP(&withKubernetesVersion, "with-version", "", "v1.27.6", "指定Kubernetes版本")
-	joinKubernetesNodeCmd.Flags().BoolVarP(&joinMasterNode, "master", "", false, "加入master节点")
-	KubernetesCmd.AddCommand(installKubernetesCmd, initKubernetesClusterCmd, joinKubernetesNodeCmd)
+	initKubernetesClusterCmd.Flags().BoolVarP(&withInitKubernetesWorkerNode, "worker-node", "", false, "初始化工作节点")
+	initKubernetesNetworkCmd.Flags().BoolVarP(&withInitKubernetesWorkerNode, "worker-node", "", false, "初始化工作节点网络")
+	joinKubernetesNodeCmd.Flags().BoolVarP(&joinMasterNode, "with-master", "", false, "加入master节点")
+	KubernetesCmd.AddCommand(installKubernetesCmd, initKubernetesClusterCmd, initKubernetesNetworkCmd, joinKubernetesNodeCmd)
 }
 
 // installKubernetes 安装k8s组件
@@ -291,12 +309,33 @@ func initKubernetesCluster(k8sVersion string) error {
 	}
 
 	// 初始化集群网络
+	return initKubernetesNetwork()
+}
+
+// initKubernetesNetwork 初始化k8s集群网络
+func initKubernetesNetwork() error {
 	fmt.Println("初始化Kubernetes集群网络...")
-	if err = pkg.ExecCmd(exec.Command("kubectl", "apply", "-f", "./config/calico.yaml")); err != nil {
+
+	var err error
+
+	if err = pkg.ExecCmd(exec.Command("ctr", "-n=k8s.io", "image", "import", "./image/calico-cni.tar")); err != nil {
 		return err
 	}
-	if err = pkg.ExecCmd(exec.Command("kubectl", "get", "nodes")); err != nil {
+	if err = pkg.ExecCmd(exec.Command("ctr", "-n=k8s.io", "image", "import", "./image/calico-node.tar")); err != nil {
 		return err
+	}
+	if err = pkg.ExecCmd(exec.Command("ctr", "-n=k8s.io", "image", "import", "./image/calico-kube-controller.tar")); err != nil {
+		return err
+	}
+
+	// 工作节点不用apply网络配置，由master节点处理
+	if !withInitKubernetesWorkerNode {
+		if err = pkg.ExecCmd(exec.Command("kubectl", "apply", "-f", "./config/calico.yaml")); err != nil {
+			return err
+		}
+		if err = pkg.ExecCmd(exec.Command("kubectl", "get", "nodes")); err != nil {
+			return err
+		}
 	}
 
 	return nil

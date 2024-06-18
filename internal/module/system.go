@@ -3,14 +3,15 @@ package module
 import (
 	"errors"
 	"fmt"
-	"github.com/dysodeng/devops-tools/internal/pkg"
-	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/dysodeng/devops-tools/internal/pkg"
+	"github.com/spf13/cobra"
 )
 
 var ArchMap = map[string]string{
@@ -67,12 +68,6 @@ var toolCmd = &cobra.Command{
 	Short: "安装系统必要的工具",
 	Long:  "安装系统必要的工具",
 	Run: func(cmd *cobra.Command, args []string) {
-		// 获取当前操作系统
-		if system.OS != "linux" {
-			fmt.Println("操作系统不是Linux")
-			os.Exit(1)
-		}
-
 		err := toolInstall(system.LinuxDistro)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -136,6 +131,13 @@ func systemInfo() System {
 		os.Exit(1)
 	}
 
+	if !pkg.IsRoot() {
+		log.Println("root permission is required to execute.")
+		os.Exit(1)
+	}
+
+sysInfo:
+
 	// 获取linux发行版本
 	distroCmd := exec.Command("lsb_release", "-a")
 	distroOutput, err := distroCmd.Output()
@@ -150,6 +152,27 @@ func systemInfo() System {
 			}
 			if strings.Contains(out, "Codename:") {
 				linuxCodeName = strings.TrimSpace(strings.Replace(out, "Codename:", "", -1))
+			}
+		}
+	} else {
+		if errors.Is(err, exec.ErrNotFound) {
+			// 安装 lsb_release
+			for _, o := range []string{"CentOS", "Ubuntu", "Debian"} {
+				switch o {
+				case "CentOS":
+					installLsbReleaseCmd := exec.Command("yum", "-y", "install", "redhat-lsb")
+					err = pkg.ExecCmd(installLsbReleaseCmd)
+					if err == nil {
+						goto sysInfo
+					}
+
+				default:
+					installLsbReleaseCmd := exec.Command("apt", "-y", "install", "lsb-release")
+					err = pkg.ExecCmd(installLsbReleaseCmd)
+					if err == nil {
+						goto sysInfo
+					}
+				}
 			}
 		}
 	}

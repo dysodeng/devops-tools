@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"sync"
 )
 
@@ -85,4 +86,13 @@ func CheckNetworkFileExists(url string) bool {
 	default:
 		return false
 	}
+}
+
+// IsRoot 是否为root用户
+func IsRoot() bool {
+	currentUser, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	return currentUser.Uid == "0"
 }
